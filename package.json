@@ -1,0 +1,16 @@
+{
+  "name": "intune-settings-catalog-data",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fetches Intune Settings Catalog data from Microsoft Graph and publishes as GitHub Release assets",
+  "scripts": {
+    "fetch-settings": "tsx scripts/fetch-settings.ts"
+  },
+  "devDependencies": {
+    "@azure/identity": "^4.2.0",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@types/node": "^20.12.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}

@@ -1,0 +1,80 @@
+name: Refresh Settings & Publish
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch settings from Microsoft Graph
+        id: fetch
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: npx tsx scripts/fetch-settings.ts
+
+      - name: Check if data changed
+        id: check
+        run: |
+          if [ "${{ steps.fetch.outputs.data_changed }}" = "true" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Data changed — will publish new release"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No data changes — skipping release"
+          fi
+
+      - name: Delete existing 'latest' release
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+
+      - name: Create 'latest' release
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create latest \
+            --title "Latest Settings Catalog Data" \
+            --notes "Auto-updated on $(date -I). Contains the full Intune Settings Catalog from Microsoft Graph." \
+            --latest \
+            data/settings.json \
+            data/categories.json \
+            data/last-updated.json
+
+      - name: Create dated release
+        if: steps.check.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v$(date -I)"
+          # Delete existing dated release/tag if re-running same day
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" \
+            --title "Settings Catalog Data $TAG" \
+            --notes "Snapshot from $(date -I)." \
+            data/settings.json \
+            data/categories.json \
+            data/last-updated.json
