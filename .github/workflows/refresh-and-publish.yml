@@ -44,6 +44,18 @@ jobs:
             echo "No data changes — skipping release"
           fi
 
+      - name: Commit data to repo
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f \
+            data/settings.json \
+            data/categories.json \
+            data/last-updated.json
+          git commit -m "chore: update settings data $(date -I)"
+          git push
+
       - name: Delete existing 'latest' release
         if: steps.check.outputs.changed == 'true'
         env:
